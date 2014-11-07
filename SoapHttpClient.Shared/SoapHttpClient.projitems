@@ -1,0 +1,17 @@
+<?xml version="1.0" encoding="utf-8"?>
+<Project xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+  <PropertyGroup>
+    <MSBuildAllProjects>$(MSBuildAllProjects);$(MSBuildThisFileFullPath)</MSBuildAllProjects>
+    <HasSharedItems>true</HasSharedItems>
+    <SharedGUID>{78A9F3B9-30C5-489B-9DD7-5CD47E7F8284}</SharedGUID>
+  </PropertyGroup>
+  <PropertyGroup Label="Configuration">
+    <Import_RootNamespace>SoapHttpClient</Import_RootNamespace>
+  </PropertyGroup>
+  <ItemGroup>
+    <Compile Include="$(MSBuildThisFileDirectory)Helpers\AsyncOperatingContext.cs" />
+    <Compile Include="$(MSBuildThisFileDirectory)Helpers\HttpClientHelper.cs" />
+    <Compile Include="$(MSBuildThisFileDirectory)Helpers\ReflectionHelper.cs" />
+    <Compile Include="$(MSBuildThisFileDirectory)SoapHttpClientBridge.cs" />
+  </ItemGroup>
+</Project>
