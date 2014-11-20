@@ -13,8 +13,16 @@ using System.Text;
 namespace System.Web.Services.Protocols
 {
 
+	/// <summary>
+	/// This is the actual bridge code that hacks into the webservice stack and hijacks the ws calls to use HttpClient that in turn uses ModernHttpClient that under the hood uses the native libraries. BOOM!
+	/// To take advantage of this you need to replace the base class in your webreferences from SoapHttpClientProtocol to SoapHttpClientBridge. 
+	/// Every time the invoke method is invoked the bridge will reroute the call to httplient.
+	/// ATM i only implemented Invoke (since it was the one used in our app and it required an already large amount of time),  any async or delegate call with begin/end will not use the Bridge.
+	/// Feel free to implement whatever is missing and to pull request on github. 
+	/// </summary>
 	public class SoapHttpClientBridge:SoapHttpClientProtocol
 	{
+		//hardcoded here, originally still hardcoded inside some obscure .Net class.
 		const string SoapEnvelopeNamespace = "http://schemas.xmlsoap.org/soap/envelope/";
 		const string Soap12EnvelopeNamespace = "http://www.w3.org/2003/05/soap-envelope";
 		const string SoapEncodingNamespace = "http://schemas.xmlsoap.org/soap/encoding/";
@@ -23,99 +31,102 @@ namespace System.Web.Services.Protocols
 
 		#region cached objects
 
-		//we cahce some stuff to avoid calling again and again just to get the same definition of a static method.
+		// we cache some stuff to avoid calling again and again just to get the same definition of a static method.
+		// i am using the classic lazy loading pattern.
 
-		static Type soapExtensionRuntimeConfigArrayType;
+		static Type _soapExtensionRuntimeConfigArrayType;
 
-		private static Type SoapExtensionRuntimeConfigArrayType {
+		static Type SoapExtensionRuntimeConfigArrayType {
 			get {
-				if (soapExtensionRuntimeConfigArrayType == null) {
-					soapExtensionRuntimeConfigArrayType = ReflectionHelper.GetTypeFromAssembly("System.Web.Services", "System.Web.Services.Protocols.SoapExtensionRuntimeConfig", true);
+				if (_soapExtensionRuntimeConfigArrayType == null) {
+					_soapExtensionRuntimeConfigArrayType = ReflectionHelper.GetTypeFromAssembly("System.Web.Services", "System.Web.Services.Protocols.SoapExtensionRuntimeConfig", true);
 
 				}
-				return soapExtensionRuntimeConfigArrayType;
+				return _soapExtensionRuntimeConfigArrayType;
 			}
 		}
 
-		static Type methodStubInfoType;
+		static Type _methodStubInfoType;
 
-		private static Type MethodStubInfoType {
+		static Type MethodStubInfoType {
 			get {
-				if (methodStubInfoType == null) {
-					methodStubInfoType = ReflectionHelper.GetTypeFromAssembly("System.Web.Services", "System.Web.Services.Protocols.SoapMethodStubInfo", false);
+				if (_methodStubInfoType == null) {
+					_methodStubInfoType = ReflectionHelper.GetTypeFromAssembly("System.Web.Services", "System.Web.Services.Protocols.SoapMethodStubInfo", false);
 
 				}
-				return methodStubInfoType;
+				return _methodStubInfoType;
 			}
 		}
 
-		static Type faultType;
+		static Type _faultType;
 
-		private static Type FaultType {
+		static Type FaultType {
 			get {
-				if (faultType == null) {
-					faultType = ReflectionHelper.GetTypeFromAssembly("System.Web.Services", "System.Web.Services.Protocols.Fault", false);
+				if (_faultType == null) {
+					_faultType = ReflectionHelper.GetTypeFromAssembly("System.Web.Services", "System.Web.Services.Protocols.Fault", false);
 				}
-				return faultType;
+				return _faultType;
 			}
 		}
 
-		static XmlSerializer faultSerializer;
+		static XmlSerializer _faultSerializer;
 
-		private static XmlSerializer FaultSerializer {
+		static XmlSerializer FaultSerializer {
 			get {
-				if (faultSerializer == null) {
-					faultSerializer = (XmlSerializer)ReflectionHelper.CreateInstance("System.Web.Services", "System.Web.Services.Protocols.FaultSerializer", new object[]{ });
+				if (_faultSerializer == null) {
+					_faultSerializer = (XmlSerializer)ReflectionHelper.CreateInstance("System.Web.Services", "System.Web.Services.Protocols.FaultSerializer", new object[]{ });
 				}
-				return faultSerializer;
+				return _faultSerializer;
 			}
 		}
 
-		static XmlSerializer fault12Serializer;
+		static XmlSerializer _fault12Serializer;
 
-		private static XmlSerializer Fault12Serializer {
+		static XmlSerializer Fault12Serializer {
 			get {
-				if (fault12Serializer == null) {
-					fault12Serializer = (XmlSerializer)ReflectionHelper.CreateInstance("System.Web.Services", "System.Web.Services.Protocols.Fault12Serializer", new object[]{ });
+				if (_fault12Serializer == null) {
+					_fault12Serializer = (XmlSerializer)ReflectionHelper.CreateInstance("System.Web.Services", "System.Web.Services.Protocols.Fault12Serializer", new object[]{ });
 				}
-				return fault12Serializer;
+				return _fault12Serializer;
 			}
 		}
 
 
 
-		static Type webServiceHelperType;
+		static Type _webServiceHelperType;
 
-		private static Type WebServiceHelperType {
+		static Type WebServiceHelperType {
 			get {
-				if (webServiceHelperType == null) {
-					webServiceHelperType = ReflectionHelper.GetTypeFromAssembly("System.Web.Services", "System.Web.Services.Protocols.WebServiceHelper", false);
+				if (_webServiceHelperType == null) {
+					_webServiceHelperType = ReflectionHelper.GetTypeFromAssembly("System.Web.Services", "System.Web.Services.Protocols.WebServiceHelper", false);
 				}
-				return webServiceHelperType;
+				return _webServiceHelperType;
 			}
 		}
 
-		static Type soapExtensionType;
+		static Type _soapExtensionType;
 
-		private static Type SoapExtensionType {
+		static Type SoapExtensionType {
 			get {
-				if (soapExtensionType == null) {
-					soapExtensionType = typeof(SoapExtension);
+				if (_soapExtensionType == null) {
+					_soapExtensionType = typeof(SoapExtension);
 				}
-				return soapExtensionType;
+				return _soapExtensionType;
 			}
 		}
 
 		#endregion
 
 		/// <summary>
-		/// Invokes the webservice
+		/// Invokes the webservice, the only twist here is an optional parameter to skip my implementation and use the old and original one. can be useful in some cases.
+		/// I reapplied all the WS stuff originally found in the invoke methods and his siblongs, so all your extensions, headers and assorted ws-stuff should also work here.
 		/// </summary>
 		/// <param name="methodName">Method name.</param>
 		/// <param name="parameters">Parameters.</param>
 		/// <param name="legacyClient">If set to <c>true</c> uses the original SOAP client as implemented in Mono.</param>
 		protected new object[] Invoke(string methodName, object[] parameters, bool legacyClient = false)
 		{
+			//skips the goodies!
 			if (legacyClient) {
 				return base.Invoke(methodName, parameters);
 			}
@@ -141,12 +152,9 @@ namespace System.Web.Services.Protocols
 
 				//extension chain
 				SoapExtension[] extensions = (SoapExtension[])ReflectionHelper.ExecuteStaticMethod(SoapExtensionType, "CreateExtensionChain", methodTypes, ClassConfiguredExtensions[0], MethodConfiguredExtensions, ClassConfiguredExtensions[1]);
-
-			
+							
 				//uri
 				object thisUri = ReflectionHelper.GetFieldValue(this, "uri");
-
-
 
 				//body
 				string requestData = null;
@@ -154,7 +162,6 @@ namespace System.Web.Services.Protocols
 					SerializeRequest(memoryStream, soapClientMessage, extensions);
 					requestData = Encoding.UTF8.GetString(memoryStream.ToArray());
 				}
-
 
 				//HttpClient sync call
 				using (HttpClientResponse clientResponse = AsyncOperatingContext.Run<HttpClientResponse>(() => { 
@@ -236,7 +243,7 @@ namespace System.Web.Services.Protocols
 				ctype = ctype.ToLower(CultureInfo.InvariantCulture);
 
 				if (ctype != "text/xml") {
-					ReflectionHelper.ExecuteStaticMethod(webServiceHelperType, "InvalidOperation", null, String.Format("Not supported Content-Type in the response: '{0}'", ctype), null, encoding);
+					ReflectionHelper.ExecuteStaticMethod(WebServiceHelperType, "InvalidOperation", null, String.Format("Not supported Content-Type in the response: '{0}'", ctype), null, encoding);
 				}
 
 				message.ContentType = ctype;

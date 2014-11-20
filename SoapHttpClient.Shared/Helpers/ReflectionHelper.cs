@@ -4,7 +4,10 @@ using System.Globalization;
 
 namespace System.Web.Services.Protocols
 {
-
+	/// <summary>
+	/// This is an helper class to ease the use of reflection in the project.
+	/// It is all pretty self explanatory, unless you do not know what reflection is. 
+	/// </summary>
 	public static class ReflectionHelper
 	{
 
@@ -33,8 +36,6 @@ namespace System.Web.Services.Protocols
 				Console.Write(ex.Message);
 				throw;
 			}
-
-			//return assembly.CreateInstance (className, false, BindingFlags.NonPublic | BindingFlags.Public | BindingFlags.CreateInstance, null, parameters, null, null);
 		}
 
 		public static Type GetTypeFromAssembly(string assemblyName, string className, bool arrayType = false)
@@ -60,17 +61,12 @@ namespace System.Web.Services.Protocols
 					type = array.GetType();
 				}
 
-				//BindingFlags flags = BindingFlags.NonPublic | BindingFlags.Public | BindingFlags.Instance;
-				//CultureInfo culture = null; // use InvariantCulture or other if you prefer
-				//object instantiatedType = Activator.CreateInstance (type, flags, null, parameters, culture);
-
 				return type;
 			} catch (Exception ex) {
 				Console.Write(ex.Message);
 				throw;
 			}
 
-			//return assembly.CreateInstance (className, false, BindingFlags.NonPublic | BindingFlags.Public | BindingFlags.CreateInstance, null, parameters, null, null);
 		}
 
 		public static object GetPropertyValue(object instance, string propertyName)

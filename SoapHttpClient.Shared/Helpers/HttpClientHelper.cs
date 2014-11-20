@@ -8,10 +8,11 @@ using System.Collections.Generic;
 using System.Text;
 using ModernHttpClient;
 
-
 namespace System.Web.Services.Protocols
 {
-
+	/// <summary>
+	/// Little wrapper class for the result returned by the calls
+	/// </summary>
 	public class HttpClientResponse : IDisposable
 	{
 		public HttpStatusCode StatusCode;
@@ -29,9 +30,13 @@ namespace System.Web.Services.Protocols
 	}
 
 
+	/// <summary>
+	/// This is the little pulsating heart of our implementation. 
+	/// Actually it takes a soap message and sends it to the correct adress.
+	/// </summary>
 	public static class HttpClientHelper
 	{
-		public static string UserAgent = "Mono Custom HttpSoapClient 1.0";
+		public static string UserAgent = "Mono Soap HttpClient Fix for WCF 1.0";
 		public static bool EnableDecompression = true;
 		public static IWebProxy Proxy = null;
 		public static int Timeout = 30;
@@ -50,17 +55,17 @@ namespace System.Web.Services.Protocols
 
 		private static HttpClient GetHttpClientForAddress(string address)
 		{		
-			#if DEBUG || RELEASE
-			const bool ManualCertificateValidation = true;
-			#else
+			// ok, this little boolean is used to enable the ServiceEndpoint manual certificate validation
+			// BUT in android it doesn't work, since ModernHttpClient DOES not implement the thing correctly. 
+			// anyway it would work for ios.
 			const bool ManualCertificateValidation = false;
-			#endif
 
 			var handler = new NativeMessageHandler(false, ManualCertificateValidation) {
 				CookieContainer = GlobalCookieContainer,
 				UseCookies = true
 			};
-					
+				
+			//proxy, seriously?
 			if (Proxy != null && handler.SupportsProxy) {
 				handler.Proxy = Proxy;
 			}
@@ -88,14 +93,17 @@ namespace System.Web.Services.Protocols
 				if (!isSoap12) {
 					client.DefaultRequestHeaders.Add("SOAPAction", "\"" + message.Action + "\"");
 				}
-				client.DefaultRequestHeaders.Add("User-Agent", UserAgent);
+
+				//if we use Add instead of TryAddWithoutValidation the client will automatically add commas wherever it finds a space.
+				//very ugly and probably not what we want.
+				client.DefaultRequestHeaders.TryAddWithoutValidation("User-Agent", UserAgent);
 
 				//Should be: 
 				//User-Agent: Mono Custom HttpSoapClient 1.0
-				//SOAPAction: "http://tempuri.org/IPingService/GetSystemAnnouncements"
+				//SOAPAction: "http://tempuri.org/Service/Method"
 				//Content-Type: text/xml; charset=utf-8
 
-				//content, with type and encoding
+				//content, with type and encoding, as string
 				var content = new StringContent(requestBody, Encoding.UTF8, message.ContentType);
 
 				//post
